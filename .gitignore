@@ -1,0 +1,17 @@
+# Backend
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+backend/.idea/
+backend/*.iml
+
+
+# Frontend
+admin/node_modules/
+admin/dist/
+admin/.env
+
+# OS files
+.DS_Store
+Thumbs.db
