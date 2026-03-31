@@ -92,23 +92,25 @@
     - Result: SUCCESS - required JDKs and Maven are available
     - Notes: No installation required
   - **Deferred Work**: None
-  - **Commit**: Pending
+  - **Commit**: 11c388d - Step 1: Setup Environment - Compile: N/A
 
 - **Step 2: Setup Baseline**
-  - **Status**: 🔘 Not Started
+  - **Status**: ✅ Completed
   - **Changes Made**:
-    - None
+    - Ran baseline compile and test-compile on Java 17
+    - Ran baseline test phase on Java 17
+    - Captured baseline result with tests skipped by configuration
   - **Review Code Changes**:
-    - Sufficiency: N/A
-    - Necessity: N/A
-      - Functional Behavior: N/A
-      - Security Controls: N/A
+    - Sufficiency: ✅ All required changes present
+    - Necessity: ✅ All changes necessary
+      - Functional Behavior: ✅ Preserved - no application source changes
+      - Security Controls: ✅ Preserved - no security changes in baseline step
   - **Verification**:
-    - Command: Not run yet
-    - JDK: Not selected
-    - Build tool: Not selected
-    - Result: Pending
-    - Notes: None
+    - Command: mvn clean test-compile; mvn clean test
+    - JDK: C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot
+    - Build tool: C:\Program Files\apache-maven-3.9.12\bin\mvn.cmd
+    - Result: SUCCESS - compilation passed; tests skipped (0 executed)
+    - Notes: Existing surefire config has skipTests=true
   - **Deferred Work**: None
   - **Commit**: Pending
 
