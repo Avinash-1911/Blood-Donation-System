@@ -9,7 +9,7 @@
 | Metric     | Baseline | Final | Status |
 | ---------- | -------- | ----- | ------ |
 | Compile    | SUCCESS (`mvn clean test-compile`) | SUCCESS (`mvn clean test-compile`) | ✅ |
-| Tests      | 0/0 passed (skipped by config) | 1/1 passed | ✅ |
+| Tests      | 0/0 passed (skipped by config) | 5/5 passed | ✅ |
 | JDK        | JDK 17.0.18 | JDK 25.0.1 | ✅ |
 | Build Tool | Maven 3.9.12 | Maven 3.9.12 | ✅ |
 
