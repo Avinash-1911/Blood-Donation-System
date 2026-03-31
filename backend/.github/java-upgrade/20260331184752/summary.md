@@ -37,6 +37,8 @@
 | 9660d3a | Step 2: Setup Baseline - Compile: SUCCESS, Tests: 0/0 passed |
 | 0279b57 | Step 3: Upgrade Runtime and Build Configuration to Java 25 - Compile: SUCCESS |
 | 04cae95 | Step 4: Final Validation - Compile: SUCCESS, Tests: 1/1 passed |
+| 4a75caa | Docs: Finalize upgrade tracking and summary |
+| ffc4e57 | Tests: Add JwtUtils unit coverage on Java 25 |
 
 ## Challenges
 
