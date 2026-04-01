@@ -29,6 +29,9 @@ public class DonorService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private GeocodingService geocodingService;
+
     // ─────────────────────────────
     // Registration
     // ─────────────────────────────
@@ -60,6 +63,16 @@ public class DonorService {
 
         if (req.getLongitude() != null && req.getLatitude() != null) {
             builder.location(new GeoJsonPoint(req.getLongitude(), req.getLatitude()));
+        } else {
+            String query = String.join(", ",
+                    req.getAddress() != null ? req.getAddress() : "",
+                    req.getCity() != null ? req.getCity() : "",
+                    req.getState() != null ? req.getState() : "",
+                    req.getPincode() != null ? req.getPincode() : "",
+                    "India");
+
+            geocodingService.geocode(query)
+                    .ifPresent(builder::location);
         }
 
         Donor saved = donorRepository.save(builder.build());

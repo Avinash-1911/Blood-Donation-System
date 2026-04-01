@@ -36,6 +36,9 @@ public class BloodRequestService {
     @Autowired
     private SmsService smsService;
 
+    @Autowired
+    private GeocodingService geocodingService;
+
     @Value("${geo.search.default.radius}")
     private double defaultRadiusKm;
 
@@ -44,6 +47,28 @@ public class BloodRequestService {
     // ─────────────────────────────
 
     public BloodRequestDTO.Response createRequest(BloodRequestDTO.CreateRequest req) {
+        GeoJsonPoint location = null;
+        String geocodedBy;
+        String geocodedAddress;
+        if (req.getLongitude() != null && req.getLatitude() != null) {
+            location = new GeoJsonPoint(req.getLongitude(), req.getLatitude());
+            geocodedBy = "FRONTEND_COORDINATES";
+            geocodedAddress = String.format("lon=%s,lat=%s", req.getLongitude(), req.getLatitude());
+        } else {
+            String query = String.join(", ",
+                req.getHospitalAddress() != null ? req.getHospitalAddress() : "",
+                req.getHospital() != null ? req.getHospital() : "",
+                req.getCity() != null ? req.getCity() : "",
+                req.getState() != null ? req.getState() : "",
+                "India");
+
+            location = geocodingService.geocode(query)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Unable to resolve location. Please provide valid city/state or coordinates."));
+            geocodedBy = "OSM_GEOCODE";
+            geocodedAddress = query;
+        }
+
         BloodRequest bloodRequest = BloodRequest.builder()
                 .requesterName(req.getRequesterName())
                 .requesterPhone(req.getRequesterPhone())
@@ -56,7 +81,9 @@ public class BloodRequestService {
                 .hospitalAddress(req.getHospitalAddress())
                 .city(req.getCity())
                 .state(req.getState())
-                .location(new GeoJsonPoint(req.getLongitude(), req.getLatitude()))
+                .location(location)
+                .geocodedBy(geocodedBy)
+                .geocodedAddress(geocodedAddress)
                 .status(BloodRequest.RequestStatus.PENDING)
                 .notes(req.getNotes())
                 .requiredByDate(req.getRequiredByDate())
