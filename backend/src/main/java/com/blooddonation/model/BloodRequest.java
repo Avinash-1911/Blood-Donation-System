@@ -53,6 +53,12 @@ public class BloodRequest {
     @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE)
     private GeoJsonPoint location;
 
+    /** Audit: FRONTEND_COORDINATES or OSM_GEOCODE */
+    private String geocodedBy;
+
+    /** Audit: source address/query used for geocoding */
+    private String geocodedAddress;
+
     @Indexed
     private RequestStatus status;
 

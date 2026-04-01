@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 
-const API_BASE = 'http://localhost:8080'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
 
 // Indian states and their cities
 const INDIA_STATES_CITIES = {
@@ -78,12 +78,16 @@ function App() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
+  const [dashboardError, setDashboardError] = useState('')
+  const [authMode, setAuthMode] = useState('existing')
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', phone: '', password: '' })
   const [loginError, setLoginError] = useState('')
   
   // Modal states
   const [showDonorModal, setShowDonorModal] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [requestsTab, setRequestsTab] = useState('my-requests')
   const [donorForm, setDonorForm] = useState({
     name: '', email: '', password: '', phone: '', bloodGroup: 'O_POSITIVE',
     age: '', gender: 'Male', city: '', address: '', state: '', pincode: ''
@@ -111,9 +115,22 @@ function App() {
         ...(opts.headers || {})
       }
     })
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.message || 'Request failed')
-    return json
+
+    const contentType = res.headers.get('content-type') || ''
+    let payload = null
+
+    if (contentType.includes('application/json')) {
+      payload = await res.json()
+    } else {
+      const text = await res.text()
+      payload = text ? { message: text } : null
+    }
+
+    if (!res.ok) {
+      throw new Error(payload?.message || `Request failed (${res.status})`)
+    }
+
+    return payload || { data: null }
   }, [auth])
 
   const login = async (e) => {
@@ -134,16 +151,43 @@ function App() {
     }
   }
 
+  const signup = async (e) => {
+    e.preventDefault()
+    setLoginError('')
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register/admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signupForm)
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.message || 'Sign up failed')
+      localStorage.setItem('bds_auth', JSON.stringify(json.data))
+      setAuth(json.data)
+      showToast('Account created successfully!')
+    } catch (err) {
+      setLoginError(err.message)
+    }
+  }
+
+  const forgotPassword = () => {
+    setLoginError('Forgot password is not configured yet. Please contact your administrator.')
+  }
+
   const logout = () => {
     localStorage.removeItem('bds_auth')
     setAuth(null)
   }
 
   const loadStats = useCallback(async () => {
+    setDashboardError('')
     try {
       const res = await apiFetch('/api/requests/stats')
       setStats(res.data)
     } catch (err) {
+      setStats(null)
+      setDashboardError(err.message)
+      showToast(err.message, 'error')
       console.error('Stats error:', err)
     }
   }, [apiFetch])
@@ -289,8 +333,15 @@ function App() {
 
   useEffect(() => {
     if (!auth) return
+    if (page === 'dashboard') {
+      loadRequests()
+      loadDonors()
+    }
     if (page === 'donors') loadDonors()
-    if (page === 'requests') loadRequests()
+    if (page === 'requests') {
+      loadRequests()
+      loadDonors()
+    }
   }, [auth, page, loadDonors, loadRequests])
 
   if (!auth) {
@@ -302,21 +353,79 @@ function App() {
             <h1>BloodSync</h1>
             <p>Admin Dashboard</p>
           </div>
-          <form onSubmit={login}>
+
+          <div className="auth-switch">
+            <button
+              type="button"
+              className={`auth-switch-btn ${authMode === 'existing' ? 'active' : ''}`}
+              onClick={() => {
+                setAuthMode('existing')
+                setLoginError('')
+              }}
+            >
+              Existing User
+            </button>
+            <button
+              type="button"
+              className={`auth-switch-btn ${authMode === 'new' ? 'active' : ''}`}
+              onClick={() => {
+                setAuthMode('new')
+                setLoginError('')
+              }}
+            >
+              New User
+            </button>
+          </div>
+
+          <form onSubmit={authMode === 'existing' ? login : signup}>
             {loginError && <div className="form-error">{loginError}</div>}
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={loginForm.email}
-                onChange={e => setLoginForm(f => ({...f, email: e.target.value}))}
-                placeholder="admin@blooddonation.com" required />
-            </div>
-            <div className="form-group">
-              <label>Password</label>
-              <input type="password" value={loginForm.password}
-                onChange={e => setLoginForm(f => ({...f, password: e.target.value}))}
-                placeholder="••••••••" required />
-            </div>
-            <button type="submit" className="btn-primary btn-block">Sign In</button>
+
+            {authMode === 'existing' ? (
+              <>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input type="email" value={loginForm.email}
+                    onChange={e => setLoginForm(f => ({...f, email: e.target.value}))}
+                    placeholder="admin@blooddonation.com" required />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input type="password" value={loginForm.password}
+                    onChange={e => setLoginForm(f => ({...f, password: e.target.value}))}
+                    placeholder="••••••••" required />
+                </div>
+                <button type="submit" className="btn-primary btn-block">Sign In</button>
+                <button type="button" className="forgot-link" onClick={forgotPassword}>Forgot password?</button>
+              </>
+            ) : (
+              <>
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <input type="text" value={signupForm.name}
+                    onChange={e => setSignupForm(f => ({...f, name: e.target.value}))}
+                    placeholder="Your name" required />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input type="email" value={signupForm.email}
+                    onChange={e => setSignupForm(f => ({...f, email: e.target.value}))}
+                    placeholder="you@example.com" required />
+                </div>
+                <div className="form-group">
+                  <label>Phone</label>
+                  <input type="text" value={signupForm.phone}
+                    onChange={e => setSignupForm(f => ({...f, phone: e.target.value}))}
+                    placeholder="+919876543210" required />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input type="password" value={signupForm.password}
+                    onChange={e => setSignupForm(f => ({...f, password: e.target.value}))}
+                    placeholder="At least 6 characters" required minLength={6} />
+                </div>
+                <button type="submit" className="btn-primary btn-block">Create Account</button>
+              </>
+            )}
           </form>
           <div className="login-hint">Default: admin@blooddonation.com / Admin@123</div>
         </div>
@@ -464,7 +573,58 @@ function App() {
                     </button>
                   </div>
                 </div>
+
+                <div className="dashboard-panels">
+                  <section className="dashboard-panel">
+                    <div className="panel-head">
+                      <h3>Recent Blood Requests</h3>
+                      <button className="panel-link" onClick={() => setPage('requests')}>View all</button>
+                    </div>
+                    {requests.length === 0 ? (
+                      <div className="panel-empty">No recent requests yet.</div>
+                    ) : (
+                      <div className="panel-list">
+                        {requests.slice(0, 5).map(r => (
+                          <div key={r.id} className="panel-row">
+                            <div>
+                              <div className="panel-row-title">{r.requesterName}</div>
+                              <div className="panel-row-sub">{r.city || 'Location not specified'}</div>
+                            </div>
+                            <div className="panel-row-right">
+                              <span className="blood-badge" style={{ background: bloodGroupColors[r.bloodGroupNeeded] || '#e74c3c' }}>
+                                {bgLabel[r.bloodGroupNeeded] || r.bloodGroupNeeded}
+                              </span>
+                              <span className="badge" style={{ background: statusColor[r.status] || '#95a5a6' }}>{r.status}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="dashboard-panel">
+                    <div className="panel-head">
+                      <h3>Donor Availability by Group</h3>
+                      <button className="panel-link" onClick={() => setPage('donors')}>Manage</button>
+                    </div>
+                    {Object.keys(bgLabel).map(group => {
+                      const total = donors.filter(d => d.bloodGroup === group).length
+                      const available = donors.filter(d => d.bloodGroup === group && d.available).length
+                      return (
+                        <div key={group} className="group-row">
+                          <span className="blood-badge" style={{ background: bloodGroupColors[group] || '#e74c3c' }}>{bgLabel[group]}</span>
+                          <div className="group-bar-wrap">
+                            <div className="group-bar" style={{ width: `${total > 0 ? (available / total) * 100 : 0}%` }} />
+                          </div>
+                          <span className="group-count">{available}/{total}</span>
+                        </div>
+                      )
+                    })}
+                  </section>
+                </div>
               </>
+            ) : dashboardError ? (
+              <div className="loading-state">Unable to load dashboard: {dashboardError}</div>
             ) : (
               <div className="loading-state">Loading dashboard...</div>
             )}
@@ -481,68 +641,102 @@ function App() {
                 <button className="btn-refresh" onClick={loadRequests}>↻ Refresh</button>
               </div>
             </div>
+            <div className="request-overview-grid">
+              <div className="request-overview-card">
+                <div className="request-overview-title">Blood Requests</div>
+                <div className="request-overview-value">{requests.length}</div>
+                <div className="request-overview-sub">{requests.filter(r => r.status === 'PENDING').length} pending</div>
+              </div>
+              <div className="request-overview-card">
+                <div className="request-overview-title">Available Donors</div>
+                <div className="request-overview-value">{donors.filter(d => d.available).length}</div>
+                <div className="request-overview-sub">{donors.filter(d => d.available && d.bloodGroup === 'O_POSITIVE').length} matching O+</div>
+              </div>
+              <div className="request-overview-card">
+                <div className="request-overview-title">Nearby Donors</div>
+                <div className="request-overview-value">{donors.filter(d => d.available && d.city).length}</div>
+                <div className="request-overview-sub">Within 50km radius</div>
+              </div>
+            </div>
+
+            <div className="request-tabs">
+              <button
+                className={`request-tab ${requestsTab === 'my-requests' ? 'active' : ''}`}
+                onClick={() => setRequestsTab('my-requests')}
+              >
+                My Blood Requests
+              </button>
+              <button
+                className={`request-tab ${requestsTab === 'available-donors' ? 'active' : ''}`}
+                onClick={() => setRequestsTab('available-donors')}
+              >
+                Available Donors
+              </button>
+            </div>
+
             {loading ? (
               <div className="loading-state">Loading...</div>
-            ) : requests.length === 0 ? (
-              <div className="empty-state">No blood requests found. Create one using the button above!</div>
+            ) : requestsTab === 'my-requests' ? (
+              requests.length === 0 ? (
+                <div className="empty-state">No blood requests found. Create one using the button above!</div>
+              ) : (
+                <div className="request-card-grid">
+                  {requests.map(r => (
+                    <div key={r.id} className="request-data-card">
+                      <div className="request-data-head">
+                        <div>
+                          <div className="request-data-name">{r.requesterName}</div>
+                          <div className="request-data-city">{r.city || 'Location not specified'}</div>
+                        </div>
+                        <div className="request-data-units">Units: {r.unitsNeeded}</div>
+                      </div>
+                      <div className="request-data-meta">
+                        <span className="blood-badge" style={{ background: bloodGroupColors[r.bloodGroupNeeded] || '#e74c3c' }}>
+                          {bgLabel[r.bloodGroupNeeded] || r.bloodGroupNeeded}
+                        </span>
+                        <span className="badge" style={{ background: urgencyColor[r.urgency] || '#95a5a6' }}>{r.urgency}</span>
+                        <span className="badge" style={{ background: statusColor[r.status] || '#95a5a6' }}>{r.status}</span>
+                      </div>
+                      <div className="request-data-actions">
+                        <select
+                          className="status-select"
+                          value={r.status}
+                          onChange={e => updateRequestStatus(r.id, e.target.value)}
+                        >
+                          {['PENDING','NOTIFIED','MATCHED','FULFILLED','CANCELLED'].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                        <button className="btn-del" onClick={() => deleteRequest(r.id)}>✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             ) : (
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Requester</th>
-                      <th>Blood Group</th>
-                      <th>Hospital</th>
-                      <th>City</th>
-                      <th>Urgency</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map(r => (
-                      <tr key={r.id}>
-                        <td>
-                          <div className="cell-primary">{r.requesterName}</div>
-                          <div className="cell-sub">{r.requesterPhone}</div>
-                        </td>
-                        <td>
-                          <span className="blood-badge"
-                            style={{ background: bloodGroupColors[r.bloodGroupNeeded] || '#e74c3c' }}>
-                            {bgLabel[r.bloodGroupNeeded] || r.bloodGroupNeeded}
-                          </span>
-                        </td>
-                        <td>{r.hospital}</td>
-                        <td>{r.city}</td>
-                        <td>
-                          <span className="badge"
-                            style={{ background: urgencyColor[r.urgency] || '#95a5a6' }}>
-                            {r.urgency}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="badge"
-                            style={{ background: statusColor[r.status] || '#95a5a6' }}>
-                            {r.status}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="action-btns">
-                            <select className="status-select"
-                              value={r.status}
-                              onChange={e => updateRequestStatus(r.id, e.target.value)}>
-                              {['PENDING','NOTIFIED','MATCHED','FULFILLED','CANCELLED'].map(s => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
-                            <button className="btn-del" onClick={() => deleteRequest(r.id)}>✕</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              donors.filter(d => d.available).length === 0 ? (
+                <div className="empty-state">No available donors found.</div>
+              ) : (
+                <div className="request-card-grid">
+                  {donors.filter(d => d.available).map(d => (
+                    <div key={d.id} className="request-data-card">
+                      <div className="request-data-head">
+                        <div>
+                          <div className="request-data-name">{d.name}</div>
+                          <div className="request-data-city">{d.city || 'Location not specified'}</div>
+                        </div>
+                        <div className="request-data-units">Donations: {d.totalDonations || 0}</div>
+                      </div>
+                      <div className="request-data-meta">
+                        <span className="blood-badge" style={{ background: bloodGroupColors[d.bloodGroup] || '#e74c3c' }}>
+                          {bgLabel[d.bloodGroup] || d.bloodGroup}
+                        </span>
+                        <span className="badge" style={{ background: '#27ae60' }}>AVAILABLE</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )}

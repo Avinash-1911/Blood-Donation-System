@@ -42,12 +42,10 @@ public class BloodRequestDTO {
 
         private String state;
 
-        /** Longitude */
-        @NotNull
+        /** Longitude (optional if backend geocoding is enabled) */
         private Double longitude;
 
-        /** Latitude */
-        @NotNull
+        /** Latitude (optional if backend geocoding is enabled) */
         private Double latitude;
 
         private String notes;
@@ -74,6 +72,8 @@ public class BloodRequestDTO {
         private String state;
         private Double longitude;
         private Double latitude;
+        private String geocodedBy;
+        private String geocodedAddress;
         private BloodRequest.RequestStatus status;
         private String notes;
         private int notifiedDonorsCount;
@@ -99,6 +99,8 @@ public class BloodRequestDTO {
                 r.longitude = req.getLocation().getX();
                 r.latitude = req.getLocation().getY();
             }
+            r.geocodedBy = req.getGeocodedBy();
+            r.geocodedAddress = req.getGeocodedAddress();
             r.status = req.getStatus();
             r.notes = req.getNotes();
             r.notifiedDonorsCount = req.getNotifiedDonorIds() != null ? req.getNotifiedDonorIds().size() : 0;
